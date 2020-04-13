@@ -1,1 +1,104 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import math
 
+start=0 #Start time (kind of redundant)
+end=5 #End time
+number=100 #Number of particles
+division=0.1 #Time division
+simno=int((end-start)/division) #Number of time increments
+boxlength=100 #Dimensions of constraining box
+meanmomentum=500 #Mean initial momentum
+momentumdeviation=10 #Momentum standard deviation
+meanmass=60 #Mean mass
+massdeviation=15 #Mass standard deviation
+t=np.arange(start,end,division) #Time variable (haven't used it yet)
+
+mass=np.zeros(number) #Array of all particle masses
+i=0
+while i<number:
+    mass[i]=np.random.normal(meanmass,massdeviation)
+    i=i+1
+
+X=np.zeros(simno*number).reshape(number,simno) #Array of all x values
+Xi=np.random.rand(number)*boxlength #Array of initial x values
+#Inputting initial x values
+i=0
+while i<=(number-1):
+    X[0,0]=Xi[0]
+    X[i,0]=Xi[i]
+    i=i+1
+
+Y=np.zeros(simno*number).reshape(number,simno) #Array of all y values
+Yi=np.random.rand(number)*boxlength #Array of initial y values
+#Inputting initial y values
+i=0
+while i <=(number-1):
+    Y[0,0]=Yi[0]
+    Y[i,0]=Yi[i]
+    i=i+1
+
+VX=np.zeros(simno*number).reshape(number,simno) #Array of all x velocities
+VXi=np.zeros(number) #Array of initial x velocities
+i=0
+while i<number:
+    VXi[i]=(np.random.normal(meanmomentum,momentumdeviation))/mass[i]
+    i=i+1
+#Inputting initial x velocities
+i=0
+while i<=(number-1):
+    VX[0,0]=VXi[0]
+    VX[i,0]=VXi[i]
+    i=i+1
+
+VY=np.zeros(simno*number).reshape(number,simno) #Array of all y velocities
+VYi=np.zeros(number) #Array of initial y velocities
+i=0
+while i<number:
+    VYi[i]=(np.random.normal(meanmomentum,momentumdeviation))/mass[i]
+    i=i+1
+#Inputting initial y velocities
+i=0
+while i<=(number-1):
+    VY[0,0]=VYi[0]
+    VY[i,0]=VYi[i]
+    i=i+1
+
+changevx=np.zeros(simno*number).reshape(number,simno) #Array of changes in x velocity due to collisions
+changevy=np.zeros(simno*number).reshape(number,simno) #Array of changes in y velocity due to collisions
+
+#Filling out x velocity array
+j=0
+while j<=(number-1):
+    i=1
+    while i<=(simno-1):
+        VX[j,i]=VX[j,i-1]+changevx[j,i-1]
+        i=i+1
+    j=j+1
+
+#Filling out y velocity array
+j=0
+while j<=(number-1):
+    i=1
+    while i<=(simno-1):
+        VY[j,i]=VY[j,i-1]+changevy[j,i-1]
+        i=i+1
+    j=j+1
+
+#Filling out x array
+j=0
+while j<=(number-1):
+    i=1
+    while i<=(simno-1):
+        X[j,i]=X[j,i-1]+VX[j,i-1]*division
+        i=i+1
+    j=j+1
+
+#Filling out y array
+j=0
+while j<=(number-1):
+    i=1
+    while i<=(simno-1):
+        Y[j,i]=Y[j,i-1]+VY[j,i-1]*division
+        i=i+1
+    j=j+1
