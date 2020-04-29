@@ -1,0 +1,157 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+
+number=100 #Number of particles
+propinfi=0.1 #Initial proportion of particles infected
+infectivity=0.5 #Pathogen infectivity
+particlesize=0.1 #Particle size
+meansusceptibility=0.5 #Mean particle susceptibility
+susceptibilitydeviation=0.1 #Particle susceptibility standard deviation
+boxlength=10 #Dimensions of constraining box
+meanmomentum=500 #Mean initial momentum (in each direction)
+momentumdeviation=20 #Momentum standard deviation
+meanmass=60 #Mean mass
+massdeviation=10 #Mass standard deviation
+meanrecov=10 #Mean number of time increments taken to recover
+recovdeviation=2 #Standard deviation in number of time increments taken to recover
+start=0 #Start time (kind of redundant)
+end=1 #End time
+division=0.01 #Time division
+t=np.arange(start,end,division) #Time variable (haven't used it yet)
+simno=int((end-start)/division) #Number of time increments
+mindist=boxlength-particlesize
+coeffres=0.5
+
+posnegrand=np.random.rand(number)
+posneg=np.zeros(number) #Randomly positive and negative array (to sign quantities)
+i=0
+while i<number:
+    if posnegrand[i]>=0.5:
+        posneg[i]=1
+    if posnegrand[i]<0.5:
+        posneg[i]=-1
+    i=i+1
+
+posnegrand2=np.random.rand(number)
+posneg2=np.zeros(number) #Randomly positive and negative array (to sign quantities)
+i=0
+while i<number:
+    if posnegrand2[i]>=0.5:
+        posneg2[i]=1
+    if posnegrand2[i]<0.5:
+        posneg2[i]=-1
+    i=i+1
+
+mass=np.zeros(number) #Array of particle masses
+i=0
+while i<number:
+    mass[i]=np.random.normal(meanmass,massdeviation)
+    i=i+1
+
+recovtime=np.zeros(number) #Recovery time for each particle
+i=0
+while i<number:
+    recovtime[i]=int(np.random.normal(meanrecov,recovdeviation))
+    i=i+1
+
+susceptibility=np.zeros(number) #Array of particles' susceptibilities to infection
+i=0
+while i<number:
+    susceptibility[i]=np.random.normal(meansusceptibility,susceptibilitydeviation)
+    i=i+1
+
+inf=np.zeros(number*simno).reshape(number,simno) #Array denoting which particles are infected
+#Filling in initial infected particles
+i=0
+while i<number:
+    if posnegrand[i]<=propinfi:
+        inf[i]=1
+    if posnegrand[i]>propinfi:
+        inf[i]=0
+    i=i+1
+
+x=np.zeros(number*simno).reshape(number,simno) #Array of all x values
+xi=np.random.rand(number)*boxlength #Array of initial x values (unsigned)
+y=np.zeros(number*simno).reshape(number,simno) #Array of all y values
+yi=np.random.rand(number)*boxlength #Array of initial y values (unsigned)
+#Inputting initial x and y values (signed)
+i=0
+while i<number:
+    x[i,0]=xi[i]*posneg[i]
+    y[i,0]=yi[i]*posneg[i]
+    i=i+1
+
+vx=np.zeros(number*simno).reshape(number,simno) #Array of all x velocities
+vxi=np.zeros(number) #Array of intitial x velocities
+vy=np.zeros(number*simno).reshape(number,simno) #Array of all y velocities
+vyi=np.zeros(number) #Array of initial y velocities
+#Generating initial x and y velocities
+i=0
+while i<number:
+    vxi[i]=((np.random.normal(meanmomentum,momentumdeviation))/mass[i])*posneg[i]
+    vyi[i]=((np.random.normal(meanmomentum,momentumdeviation))/mass[i])*posneg2[i]
+    i=i+1
+#Inputting initial x and y velocities
+i=0
+while i<number:
+    vx[i,0]=vxi[i]
+    vy[i,0]=vyi[i]
+    i=i+1
+
+#Incrementing positions
+i=0
+while i<number:
+    j=0
+    while j<simno-1:
+        if abs(x[i,j])<mindist:
+            x[i,j+1]=x[i,j]+vx[i,j]*division
+            vx[i,j+1]=vx[i,j]
+        if abs(y[i,j])<mindist:
+            y[i,j+1]=y[i,j]+vy[i,j]*division
+            vy[i,j+1]=vy[i,j]
+        if abs(x[i,j])>=mindist:
+            x[i,j+1]=x[i,j]-vx[i,j]*division
+            vx[i,j+1]=-vx[i,j]
+        if abs(y[i,j])>=mindist:
+            y[i,j+1]=y[i,j]-vy[i,j]*division
+            vy[i,j+1]=-vy[i,j]
+        j=j+1
+    i=i+1
+
+D=np.zeros(number*number*simno).reshape(number,number,simno) #Array of all distances between particles
+DX=np.zeros(number*number*simno).reshape(number,number,simno) #Array of all x distances between particles
+DY=np.zeros(number*number*simno).reshape(number,number,simno) #Array of all y distances between particles
+#Calculating x distances
+i=0
+while i<number:
+    j=0
+    while j<number:
+        k=0
+        while k<simno:
+            DX[i,j,k]=x[i,k]-x[j,k]
+            k=k+1
+        j=j+1
+    i=i+1
+#Calculating y distances
+i=0
+while i<number:
+    j=0
+    while j<number:
+        k=0
+        while k<simno:
+            DY[i,j,k]=y[i,k]-y[j,k]
+            k=k+1
+        j=j+1
+    i=i+1
+#Calculating full distances
+i=0
+while i<number:
+    j=0
+    while j<number:
+        k=0
+        while k<simno:
+            D[i,j,k]=math.sqrt(DX[i,j,k]**2+DY[i,j,k]**2)
+            k=k+1
+        j=j+1
+    i=i+1
