@@ -3,7 +3,7 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 
 #I'm using the equations from this website:
-#http://www.public.asu.edu/~hnesse/classes/seir.html
+#https://www.idmod.org/docs/hiv/model-sir.html
 beta=0.9
 sigma=0.2
 gamma=0.5
