@@ -1,0 +1,48 @@
+import numpy as np
+from scipy.integrate import odeint
+import matplotlib.pyplot as plt
+
+alpha=0.1
+beta=0.9
+gamma=0.1
+delta=0.1
+Lambda=0.1
+kappa=0.1
+N=1000
+
+def disease(x,t):
+    S=x[0] #Succeptible
+    P=x[1] #Insusceptible
+    E=x[2] #Exposed
+    I=x[3] #Infective
+    R=x[4] #Recovered
+    Q=x[5] #Quarantined
+    D=x[6] #Dead
+    dSdt=-((beta*S*I)/N)-alpha*S
+    dPdt=alpha*S
+    dEdt=((beta*S*I)/N)-(gamma*E)
+    dIdt=gamma*E-delta*I
+    dQdt=delta*I-Lambda*Q-kappa*Q
+    dRdt=Lambda*Q
+    dDdt=kappa*Q
+    return [dSdt,dPdt,dEdt,dIdt,dQdt,dRdt,dDdt]
+
+x0=[1000,0,0,10,0,0,0] #Array of initial parameters [S,P,E,I,R,Q,D]
+t=np.linspace(0,15,1000)
+x=odeint(disease,x0,t)
+S=x[:,0]
+P=x[:,1]
+E=x[:,2]
+I=x[:,3]
+R=x[:,4]
+Q=x[:,5]
+D=x[:,6]
+plt.plot(t, S, label='Susceptible')
+plt.plot(t, P, label='Insusceptible')
+plt.plot(t, E, label='Exposed')
+plt.plot(t, I, label='Infective')
+plt.plot(t, R, label='Recovered')
+plt.plot(t, Q, label='Quarantined')
+plt.plot(t, D, label='Dead')
+plt.legend()
+plt.show()
