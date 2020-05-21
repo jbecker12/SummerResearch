@@ -1,0 +1,33 @@
+import numpy as np
+from scipy.integrate import odeint
+import matplotlib.pyplot as plt
+
+#I'm using the equations from this website:
+#http://www.public.asu.edu/~hnesse/classes/seir.html
+beta=0.9
+sigma=0.2
+gamma=0.5
+epsilon=0.05
+N=1000
+
+def disease(x,t):
+    S=x[0] #Succeptible
+    I=x[1] #Infected
+    R=x[2] #Resistant
+    dSdt=-((beta*S*I)/N)+epsilon*R
+    dIdt=((beta*S*I)/N)-(gamma*I)
+    dRdt=(gamma*I)-(epsilon*R)
+    return [dSdt,dIdt,dRdt]
+
+#N.B. N=S+I+R
+x0=[990,10,0] #Array of initial parameters [S,I,R] 
+t=np.linspace(0,100,10000)
+x=odeint(disease,x0,t)
+S=x[:,0]
+I=x[:,1]
+R=x[:,2]
+plt.plot(t, S, label='Susceptible')
+plt.plot(t, I, label='Infected')
+plt.plot(t, R, label='Removed')
+plt.legend()
+plt.show()
