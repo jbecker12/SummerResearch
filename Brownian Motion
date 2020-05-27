@@ -1,0 +1,50 @@
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+
+number=500 #Number of particles
+start=0 #Start time
+end=1 #End time
+startbox=0.0 #Determines size of box the particles start in
+division=0.01 #Time division
+meandist=0 #Mean distance travelled (signed)
+distdeviation=0.1 #Standard deviation of distance travelled
+simno=int((end-start)/division) #Number of time increments
+x=np.zeros(number*simno).reshape(number,simno) #Array of x positions
+y=np.zeros(number*simno).reshape(number,simno) #Array of y positions
+xi=np.random.rand(number)*startbox #Array of initial x positions
+yi=np.random.rand(number)*startbox #Array of initial y poisitons
+
+dist=np.zeros(number*simno).reshape(number,simno) #Array of distances travelled in each time increment
+i=0
+while i<number:
+    k=0
+    while k<simno:
+        dist[i,k]=np.random.normal(meandist,distdeviation)
+        k=k+1
+    i=i+1
+    
+angle=np.zeros(number*simno).reshape(number,simno) #Array of angle at which each distance is projected for each time increment
+i=0
+while i<number:
+    angle[i]=2*math.pi*np.random.rand(simno) 
+    i=i+1
+    
+i=0
+while i<number:
+    k=0
+    while k<simno:
+        #Inputting initial x and y values
+        x[i,0]=xi[i]
+        y[i,0]=yi[i]
+        #Calculating subsequent x and y values
+        x[i,k]=x[i,k-1]+dist[i,k]*math.cos(angle[i,k])
+        y[i,k]=y[i,k-1]+dist[i,k]*math.sin(angle[i,k])
+        k=k+1
+    i=i+1
+
+#Plots all trajectories
+i=0
+while i<number:
+    plt.plot(x[i],y[i])
+    i=i+1
