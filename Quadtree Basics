@@ -1,0 +1,99 @@
+import random
+
+#for n particles quad tree needs only nlog(n) collision checks
+
+class point():    #constructor for x and y coordinates
+    def _init_(self,x,y):
+        self.x = x
+        self.y = y
+
+
+class node():   #stores number of points in each subdivision 
+              #when no. of points reaches a specified limit the tree subdivides
+              #each node is a subdivision
+    
+    def _init_(self,x0,y0,w,h,points):  #constructor for node class
+        self.x0 = x0
+        self.y0 = y0
+        self.w = w     #width of rectangle subdivision
+        self.h = h      #height of rectangle subdivision
+        self.points = points
+        self.children=[]  #each node has 4 children (divided into  4 other nodes)
+        
+    def find_width(self):       #determine width
+        return self.width
+    
+    def find_height(self):      #determine height
+        return self.height
+    
+    def find_points(self):      #determine points
+        return self.points
+    
+    
+def container(x,y,w,h,points):  #check whether point is in rectangle subdivision
+    p = []  #list of points in a subdivison
+    for point in points:
+        if point.x >= x and point.x <= x + w and point.y >= y and point.y <= y+h:
+            p.append(point)
+    return p
+    
+    
+    
+def recur_subdiv(node,k):     #recursive subdivision helper method for nodes
+    if len(node.points) <= k:   #check if no. of points exceeds limit
+        return
+    
+    w1 = float(node.width/2)   #subdivided rectangle dimensions
+    h1 = float(node.height/2)
+    
+    p_ = container(node.x0, node.y0, w1, h1, node.points)
+    x1 = node(node.x0, node.y0, w1, h1, p_)
+    recur_subdiv(x1, k)
+    
+    p_ = container(node.x0, node.y0 + h1, w1, h1, node.points)
+    x2 = node(node.x0, node.y0 + h1, w1, h1, p_)
+    recur_subdiv(x2, k)
+    
+    p_ = container(node.x0 +w1, node.y0, w1, h1, node.points)
+    x3 = node(node.x0 + w1, node.y0, w1, h1, p_)
+    recur_subdiv(x3, k)
+    
+    p_ = container(node.x0 + w1, node.y0 + h1, w1, h1, node.points)
+    x4 = node(node.x0 + w1, node.y0 + h1, w1, h1, p_)
+    recur_subdiv(x4, k)
+    
+    node.children = [x1, x2, x3, x4]
+    
+    #x1, x2, x3, x4 are the four new nodes each node is divided into
+    
+    
+    
+def find_children(node):        #determine children of nodes
+    if not node.children:       #node with no children
+        return [node]
+    else:
+        children = []
+        for child in node.children:
+            children += (find_children(child))   #adding each child to the list of children for each node
+            return children                      #itereative addition
+#essentially creating map of all children for a node
+    
+    
+    
+    
+class qtree():
+    def _init_(self,k,n):
+        self.limit = k   #no. of points at which a node subdivides
+        self.points = [point(random.uniform(0, 10), random.uniform(0, 10)) for x in range(n)]   #random points generator
+        self.root = node(0,0,10,10, self.points)    #root node which is the entire region random points are found in
+        
+    def insert_point(self,x,y):
+        self.points.append(point(x,y))  #add random points to coordinates used in quad tree
+        
+    def find_points(self):
+        return self.points
+    
+    def subdivide(self):    #divides each node when limit of k is reached
+        recur_subdiv(self.root, self.limit)  
+
+    
