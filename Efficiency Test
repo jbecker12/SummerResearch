@@ -1,0 +1,184 @@
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+import time
+import scipy
+
+wholestart=time.time() #Used to measure time taken for whole application to run
+particlesize=0.5 #Size of particles
+number=0 #Initial number of particles
+runno=300 #Number of simulation runs for each number of particles
+numincrease=50 #Maximum increase in number of particles from initial number
+numstep=2 #Step size for increase in number
+numnum=numincrease/numstep #Number of increases
+runtimes=np.zeros(numnum*runno).reshape(numnum,runno) #Array that containes all program runtimes
+boxlength=10 #Defines size of confining box
+
+#Spatial hashing specific
+minimum=-boxlength
+maximum=boxlength
+cellsize=2
+width=(maximum-minimum)/cellsize
+nobuckets=width**2
+
+s=0
+while s<numnum:
+    r=0
+    while r<runno:
+        start_time=time.time()
+        #Creating randomly positive and negative arrays
+        posnegrand=np.random.rand(number)
+        posnegrand2=np.random.rand(number)
+        posneg=np.zeros(number)
+        posneg2=np.zeros(number)
+        i=0
+        while i<number:
+            if posnegrand[i]>=0.5:
+                posneg[i]=1
+            else:
+                posneg[i]=-1
+            if posnegrand2[i]>=0.5:
+                posneg2[i]=1
+            else:
+                posneg2[i]=-1
+            i=i+1
+        #Creating random x and y values
+        x=np.random.random(number)*boxlength
+        y=np.random.random(number)*boxlength
+        #Signing values
+        i=0
+        while i<number:
+            x[i]=x[i]*posneg[i]
+            y[i]=y[i]*posneg2[i]
+            i=i+1
+        
+        def dist(a,b): #Function that calculates distance between particles
+            return np.sqrt((x[a]-x[b])**2+(y[a]-y[b])**2)
+        
+        def grid(a,b): #Function that calculates spatial hash (Collision 2)
+            return (np.floor(a/cellsize)+np.floor(b/cellsize))*width
+        
+        def grid2(a,b): #Function that calculates spatial hash (Collision 3)
+            return (np.floor(a/cellsize))*width,(np.floor(b/cellsize))*width
+        
+        grid_cell=grid(x,y) #Calculation of spatial hashing (Collision 2)
+        grid_cell2=np.zeros(number*2).reshape(2,number)
+        grid_cell2[0]=grid(x,0)
+        grid_cell2[1]=grid(0,y)
+        
+#        Collision 1 (Most basic and least efficient)
+        i=0
+        d=0
+        collcheck1=0
+        while i<number:
+            k=0
+            while k<number:
+                if i!=k:
+                    d=dist(i,k)
+                    if d<=2*particlesize:
+                        collcheck1=collcheck1+1
+                k=k+1
+            i=i+1
+        print collcheck1
+        print("--- %s seconds ---" % (time.time()-start_time)) #Prints specific program runtime
+        runtimes[s,r]=(time.time()-start_time)
+        
+        #Collision 2 (Spatial hashing)
+#        i=0
+#        d=0
+#        collcheck2=0
+#        while i<number:
+#            k=0
+#            while k<number:
+#                if i!=k:
+#                    if abs(grid_cell[i]-grid_cell[k])<=width:
+#                        d=dist(i,k)
+#                        if d<=2*particlesize:
+#                            collcheck2=collcheck2+1
+#                k=k+1
+#            i=i+1
+#        print collcheck2
+#        print("--- %s seconds ---" % (time.time()-start_time)) #Prints specific program runtime
+#        runtimes[s,r]=(time.time()-start_time)
+        
+        #Collision 3 (xgrid and ygrid)
+#        i=0
+#        d=0
+#        collcheck3=0
+#        while i<number:
+#            k=0
+#            while k<number:
+#                if i!=k:
+#                    if abs(grid_cell2[0,i]-grid_cell2[0,k])<=width and abs(grid_cell2[1,i]-grid_cell2[1,k])<=width:
+#                        d=dist(i,k)
+#                        if d<=2*particlesize:
+#                            collcheck3=collcheck3+1
+#                k=k+1
+#            i=i+1
+#        print collcheck3
+#        print("--- %s seconds ---" % (time.time()-start_time)) #Prints specific program runtime
+#        runtimes[s,r]=(time.time()-start_time)
+        r=r+1
+    number=number+numstep
+    s=s+1
+
+def avg(a): #Function to get average
+    return sum(a)/len(a)
+
+avgs=np.zeros(numnum) #Average calculation time for each number of particles
+s=0
+while s<numnum:
+    avgs[s]=avg(runtimes[s])
+    s=s+1
+
+stds=np.zeros(numnum) #Standard deviation for each number of particles (to give error)
+s=0
+while s<numnum:
+    stds[s]=np.std(runtimes[s])
+    s=s+1
+
+#N.B. Won't fit if graph strays too far away from fitting function (returns error bellow)
+
+def quadraticfit(numberpart,a,b,c): #Quadratic fit function
+    return a*numberpart**2+b*numberpart+c
+
+def nlognfit(numberpart,a,b): #nlogn fit function
+    return a*numberpart*np.log(numberpart)+b
+
+numberpart=np.arange(0,numincrease,numstep)
+
+#Base graph
+base=plt.figure()
+plt.errorbar(numberpart,avgs,yerr=stds)
+plt.plot(numberpart,avgs)
+plt.show
+
+#Quadratic fit
+popt,pcov= scipy.optimize.curve_fit(quadraticfit,numberpart,avgs)
+print 'a:',popt[0]
+print 'b:',popt[1]
+print 'c:',popt[2]
+millionest=popt[0]*1e6**2+popt[1]*1e6+popt[2]
+print 'Estimated runtime for one million particles:',millionest,'seconds'
+print 'Estimated runtime for one million particles:',millionest/60,'minutes'
+print 'Estimated runtime for one million particles:',millionest/3600,'hours'
+print 'Estimated runtime for one million particles:',millionest/86400,'days'
+#Quadratic fit and base graph together
+quadratic=popt[0]*numberpart**2+popt[1]*numberpart+popt[2]
+plt.plot(numberpart,avgs,numberpart,quadratic)
+
+#nlogn fit
+#popt,pcov=scipy.optimize.curve_fit(nlognfit,numberpart,avgs,maxfev=600000)
+#print 'a:',popt[0]
+#print 'b:',popt[1]
+#millionest=popt[0]*1e6*math.log(1e6)+popt[1]
+#print 'Estimated runtime for one million particles:',millionest,'seconds'
+#print 'Estimated runtime for one million particles:',millionest/60,'minutes'
+#print 'Estimated runtime for one million particles:',millionest/3600,'hours'
+#print 'Estimated runtime for one million particles:',millionest/86400,'days'
+##nlogn fit and base graph together
+#nlogn=popt[0]*numberpart*math.log(numberpart)+popt[1]
+#plt.plot(numberpart,avgs,numberpart,nlogn)
+
+wholeruntime=time.time()-time.time() #Time taken for whole application to run
+print wholeruntime
