@@ -1,0 +1,364 @@
+import math
+import sys
+import random
+import numpy as np
+
+
+number=40
+start=0
+end=20
+division=0.01
+simno=int((end-start)/division)
+boxlength=10
+particlesize=0.2
+meanmass=60 #Mean mass
+massdeviation=15 #Mass standard deviation
+meanmomentum=650 #Mean initial momentum (in each direction)
+momentumdeviation=50 #Momentum standard deviation
+
+
+mass=np.zeros(number) #Array of particle masses
+i=0
+while i<number:
+    mass[i]=np.random.normal(meanmass,massdeviation)
+    i=i+1
+
+posnegrand=np.random.rand(number)
+posnegrand2=np.random.rand(number)
+posneg=np.zeros(number)
+posneg2=np.zeros(number)
+i=0
+
+while i<number:
+    if posnegrand[i]>=0.5:
+        posneg[i]=1
+    else:
+        posneg[i]=-1
+    if posnegrand2[i]>=0.5:
+        posneg2[i]=1
+    else:
+        posneg2[i]=-1
+    i=i+1
+
+x=np.zeros(number*simno).reshape(number,simno) #Array of all x values
+y=np.zeros(number*simno).reshape(number,simno) #Array of all y values
+xi=np.random.rand(number)*(boxlength-particlesize) #Array of initial x values (unsigned)
+yi=np.random.rand(number)*(boxlength-particlesize) #Array of initial y values (unsigned)
+#Inputting initial x and y values
+i=0
+while i<number:
+    x[i,0]=xi[i]*posneg[i]
+    y[i,0]=yi[i]*posneg2[i]
+    i=i+1
+
+
+vx=np.zeros(number*simno).reshape(number,simno) #Array of all x velocities
+vy=np.zeros(number*simno).reshape(number,simno) #Array of all y velocities
+
+speed=np.zeros(number) #Array of particles' intitial speeds
+angles=np.random.random(number)*math.pi*2 #Array of particles' intiial angles of projection
+#Creating and inputting initial x and y velocities
+i=0
+while i<number:
+    speed[i]=(np.random.normal(meanmomentum,momentumdeviation))/mass[i]
+    vx[i,0]=speed[i]*math.cos(angles[i])
+    vy[i,0]=speed[i]*math.sin(angles[i])
+    i=i+1
+
+def dist(a,b,c): #Function to evaluate distance between two particles
+    return np.sqrt((x[a,c]-x[b,c])**2+(y[a,c]-y[b,c])**2)
+
+averagevel=np.average(speed) #Average of initial speeds
+worstcasenocoll=int(np.ceil((particlesize/averagevel)/division)) #Worst case number of increments for exclusion
+nocoll=worstcasenocoll+1 #Number of increments for exclusion
+check=np.zeros(number*simno).reshape(number,simno) #Array to check for exclusion
+
+mindist=boxlength-particlesize #Just to make things shorter in for loop
+
+
+
+class Point:
+     """ constructor for particle characteristics"""
+     def __init__(self, x, y , fx=1, fy=1, radius=3):
+        self.x = x
+        self.y = y
+        self.fx = fx
+        self.fy = fy
+        self.rad = radius
+        
+        def insert_point(self,p):
+            return Point(self.x + p.x, self.y + p.y)
+        
+        def set_x(self,x):
+            self.x = x
+            
+        def set_y(self,y):
+            self.y = y
+            
+        def update_v(self, velocity):
+            self.velocity = velocity
+        
+        
+#pygame related
+#class Window:
+#	width = 800
+#	height = 500
+#	windowScreen = pygame.display.set_mode([width,height])
+#
+#	def getHeight(self):
+#		return self.height
+#
+#	def getWidth(self):
+#		return self.width
+#
+#	def getWindowReference(self):
+#		return self.windowScreen
+            
+            
+
+#class Color(Enum):
+#	WHITE = (255,255,255)
+#	GREEN = (0,255,0)
+#	BLACK = (0,0,0)
+#	RED = (255,0,0)
+#	BLUE = (0,0,255)
+
+        
+        
+    
+def container(point, region):
+    """determines whether point is in rectangle region"""
+    up_left = region[0]
+    xsmall = up_left.x   #smallest coordinates corner of
+    ysmall = up_left.y   #rectangle region
+    
+    down_right = region[1]
+    xbig = down_right.x  #largest coordinates corner of 
+    ybig = down_right.y  #rectangle region
+    
+    find_x = (point.x >= xsmall) and (point.x <= xbig) #finds whether x value is in region
+    find_y = (point.y >= ysmall) and (point.y <= ybig) #finds whether y value is in region
+    return find_x and find_y
+
+
+#using Conor's distance function instead
+#def collision_detect(point1, point2):   
+ #   dx = point2.x - point1.x
+  #  dy = point2.y - point1.y
+   # total_r = point1.radius + point2.radius
+    #
+    #if (dx*dx + dy*dy) < total_r*total_r:
+     #   return True
+    #return False
+
+
+#pygame stuff
+#def drawLine(windowScreen, color, point1, point2):
+#	pygame.draw.line(windowScreen, color, point1,point2)
+
+#def drawPointSizedObject(windowScreen, color, coords, rad,width = 0):
+#	pygame.draw.circle(windowScreen,color,coords,rad,width)
+
+
+#def setWindowCaption(caption):
+#	pygame.display.set_caption(caption)
+
+
+
+class Node:
+    """quadtree node data structure, each node has 4 children when it subdivides"""
+    def __init__(self):
+        self.children = []
+    
+    def check_leaf(self):   #checks whether node has children
+        for child in self.children:
+            if child is not None:
+                return False
+        return True
+    
+    
+class Quadtree:
+    """quadtree data structure"""
+    def __init__(self, boundary):
+        self.root = None  #root node?
+        self.boundary = boundary
+        self.points = []
+        self.limit = 2  #max no. of points in node
+        self.collisions = 0
+        
+    def empty(self):  #checks whether quad tree is empty (True if empty)
+        return self.root == None
+
+    def find_point(self, qtree, point):   # returns first reference to where the point should be inserted
+        if (qtree.root.check_leaf()):     # invariant: if its a leaf, it has to be present in bounding box
+            return self
+        
+        for i in range(4):
+            q = qtree.root.children[i]
+            
+            if (container(point, q.boundary)):
+                if (q.empty()):
+                    return q
+                return q.find_point(q,point)
+        return self    #should never reach here
+    
+    def insert_point(self, point):
+        """inserts point into quadtree"""
+        if not (container(point, self.boundary)):
+            return 
+        
+        if (self.empty()):
+            self.root = Node()
+            self.points.append(point)     #don't really know 
+            return                        #what's
+                                          #going on here.
+        q = self.find_point(self, point)  #node being checked
+        if (q.empty()):
+            q.root = Node()
+            q.points.append(point)
+
+        elif (q.root.leaf() and len(q.points) < q.limit):
+            q.points.append(point)   #adds points to node (under limit)
+
+        elif (q.root.leaf()):   #subdivides node as limit exceeded
+            q.poits.append(point)
+            q.split()
+
+        else: # not a leaf
+                for child in q.root.children:
+                    child.insert(point)
+                
+    def divide(self):
+        """divides quadtree into 4 smaller quadtrees"""
+        if (self.empty()):
+            return
+        up_left = self.boundary[0]    #same as before
+        xsmall = up_left.x            #checking whether point 
+        ysmall = up_left.y            #is in rectangular region
+    
+        down_right = self.boundary[1]
+        xbig = down_right.x
+        ybig = down_right.y
+        
+        avg_x = (xsmall + xbig)/2
+        avg_y = (ysmall + ybig)/2
+        
+        q1 = Quadtree((Point(avg_x, ysmall), Point(xbig, avg_y)))   #children of parent node q
+        q2 = Quadtree((Point(xsmall,ysmall), Point(avg_x, avg_y)))
+        q3 = Quadtree((Point(xsmall, avg_y), Point(avg_x, ybig)))
+        q4 = Quadtree((Point(avg_x, avg_y), Point(xbig, ybig)))
+        
+        #drawLine(Window().getWindowReference(), Color.BLACK.value, (meanX, lowerY), (meanX, higherY))
+		#drawLine(Window().getWindowReference(), Color.BLACK.value, (lowerX, meanY), (higherX, meanY))
+        
+        assert (len(self.points)) > self.limit   #only for node in which limit is exceeded
+        for point in self.points:
+            if (container(point, q1.boundary)):   #inserts points into new nodes
+                q1.insert(point)
+            elif (container(point, q2.boundary)):
+                q2.insert(point)
+            elif (container(point, q3.boundary)):
+                q3.insert(point)
+            elif (container(point, q4.boundary)):
+                q4.insert(point)
+            
+            self.root.children = [q1,q2,q3,q4] #adds to quadtree path?
+        
+        def dist(self,a,b,c): #Function to evaluate distance between two particles
+            self.a=a     #don't know whehter this is the write way
+            self.b=b     #to implement this in class
+            self.c=c
+            return np.sqrt((x[a,c]-x[b,c])**2+(y[a,c]-y[b,c])**2)
+        
+        
+        def collision_count(self):
+            """detect collisions using the quadtree framework"""
+            if (self.empty()):
+                return self.collisions  #empty leaf (no. of points < limit)
+            if (self.root.leaf()):
+                i=0
+                points_num = len(self.points)
+             
+     #my attempt of merging the collisions into the quadtree            
+            j=0
+            while j<simno:
+    #Wall collisions
+                i=0
+                while i<number and j!=simno-1:
+                    if abs(x[i,j])>mindist:
+                        x[i,j+1]=x[i,j]-vx[i,j]*division
+                        vx[i,j+1]=-vx[i,j]
+                    else:
+                        x[i,j+1]=x[i,j]+vx[i,j]*division
+                        vx[i,j+1]=vx[i,j]
+                        if abs(y[i,j])>=mindist:
+                            y[i,j+1]=y[i,j]-vy[i,j]*division
+                            vy[i,j+1]=-vy[i,j]
+                        else:
+                            y[i,j+1]=y[i,j]+vy[i,j]*division
+                            vy[i,j+1]=vy[i,j]
+                            i=i+1
+        
+        
+    #Particle collisions
+                h=0
+                while h<number:
+                    k=0
+                    while k<number:
+                        if k!=h and check[k,j]==0.0 and check[h,j]==0.0:
+                            if dist(h,k,j)<=2*particlesize and j!=simno-1:
+                                theta=math.atan((y[h,j]-y[k,j])/(x[h,j]-x[k,j])) 
+                                alpha=math.atan((vx[h,j])/(vy[h,j]))
+                                beta=math.atan((vx[k,j])/(vy[k,j]))
+                                magvh=np.sqrt(vx[h,j]**2+vy[h,j]**2)
+                                magvk=np.sqrt(vx[k,j]**2+vy[k,j]**2)
+                                vxhinitialprime=magvh*math.sin(alpha-theta)
+                                vxkinitialprime=magvk*math.sin(beta+theta)
+                                vyhprime=magvh*math.cos(alpha-theta)
+                                vykprime=magvk*math.cos(beta+theta)
+                                vxhfinalprime=(mass[h]-mass[k])/(mass[h]+mass[k])*(vxhinitialprime-vxkinitialprime) #con. of momentum
+                                vxkfinalprime=(2*mass[h]/(mass[h]+mass[k]))*(vxhinitialprime-vxkinitialprime)
+                                newmagvh=np.sqrt(vyhprime**2+vxhfinalprime**2)
+                                newmagvk=np.sqrt(vykprime**2+vxkfinalprime**2)
+                                newalpha=math.atan((vyhprime)/(vxhfinalprime))
+                                newbeta=math.atan((vykprime)/(vxkfinalprime))
+                                newvxh=newmagvh*math.cos(newalpha)
+                                newvyh=newmagvh*math.sin(newalpha)
+                                newvxk=newmagvk*math.cos(newbeta)
+                                newvyk=newmagvk*math.sin(newbeta)
+                                x[h,j+1]=x[h,j]+(newvxh)*division
+                                y[h,j+1]=y[h,j]+(newvyh)*division
+                                x[k,j+1]=x[k,j]+(newvxk)*division
+                                y[k,j+1]=y[k,j]+(newvyk)*division
+                                vx[h,j]=newvxh
+                                vx[k,j]=newvxk
+                                vy[h,j]=newvyh
+                                vy[k,j]=newvyk
+                                vx[h,j+1]=newvxh
+                                vx[k,j+1]=newvxk
+                                vy[h,j+1]=newvyh
+                                vy[k,j+1]=newvyk
+                                #Exclusion (prevents multiple subsequent positions between the same particles)
+                                d=0
+                                while d<nocoll and j+d!=simno-1:
+                                    check[h,j+d]=1.0
+                                    check[k,j+d]=1.0
+                                    d=d+1
+                                self.collisions += 1
+                    k=k+1
+                h=h+1
+            j=j+1            
+            
+            
+            
+            for i in range(4):
+                self.collisions += self.root.children[i].countCollisions()
+                return self.collisions
+        
+
+#have no clue how to do the next part
+
+
+        
+        
+   
