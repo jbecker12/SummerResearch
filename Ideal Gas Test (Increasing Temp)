@@ -1,0 +1,227 @@
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+
+number=20
+runno=10
+start=0
+end=15
+division=0.01
+simno=int((end-start)/division)
+boxlength=10
+particlesize=0.3
+meanmass=60 #Mean mass
+massdeviation=15 #Mass standard deviation
+meanmomentum=900 #Mean initial momentum (in each direction)
+momentumdeviation=150 #Momentum standard deviation
+numincrease=1500 #Maximum increase in number of particles from initial number
+numstep=150 #Step size for increase in number
+numnum=numincrease/numstep #Number of increases
+
+minimum=-boxlength
+maximum=boxlength
+cellsize=1
+width=(maximum-minimum)/cellsize
+nobuckets=width**2
+
+runpressure=np.zeros(numnum*runno).reshape(numnum,runno)
+runtemp=np.zeros(numnum*runno).reshape(numnum,runno)
+s=0
+while s<numnum:
+    r=0
+    while r<runno:
+        mass=np.zeros(number) #Array of particle masses
+        i=0
+        while i<number:
+            mass[i]=np.random.normal(meanmass,massdeviation)
+            i=i+1
+        
+        #Randomly positive and negative arrays
+        posnegrand=np.random.rand(number)
+        posnegrand2=np.random.rand(number)
+        posneg=np.zeros(number)
+        posneg2=np.zeros(number)
+        i=0
+        while i<number:
+            if posnegrand[i]>=0.5:
+                posneg[i]=1
+            else:
+                posneg[i]=-1
+            if posnegrand2[i]>=0.5:
+                posneg2[i]=1
+            else:
+                posneg2[i]=-1
+            i=i+1
+        
+        x=np.zeros(number*simno).reshape(number,simno) #Array of all x values
+        y=np.zeros(number*simno).reshape(number,simno) #Array of all y values
+        xi=np.random.rand(number)*(boxlength-particlesize) #Array of initial x values (unsigned)
+        yi=np.random.rand(number)*(boxlength-particlesize) #Array of initial y values (unsigned)
+        #Inputting initial x and y values
+        i=0
+        while i<number:
+            x[i,0]=xi[i]*posneg[i]
+            y[i,0]=yi[i]*posneg2[i]
+            i=i+1
+        
+        vx=np.zeros(number*simno).reshape(number,simno) #Array of all x velocities
+        vy=np.zeros(number*simno).reshape(number,simno) #Array of all y velocities
+        
+        speed=np.zeros(number) #Array of particles' intitial speeds
+        angles=np.random.random(number)*math.pi*2 #Array of particles' intiial angles of projection
+        #Creating and inputting initial x and y velocities
+        i=0
+        while i<number:
+            speed[i]=(np.random.normal(meanmomentum,momentumdeviation))/mass[i]
+            vx[i,0]=speed[i]*math.cos(angles[i])
+            vy[i,0]=speed[i]*math.sin(angles[i])
+            i=i+1
+        
+        def dist(a,b,c): #Function to evaluate distance between two particles
+            return np.sqrt((x[a,c]-x[b,c])**2+(y[a,c]-y[b,c])**2)
+        
+        def rot(vx,vy,h,j,theta): #Function that rotates vector, given orthogonal components (returns x',y' components)
+            return vx[h,j]*math.cos(theta)-vy[h,j]*math.sin(theta), vx[h,j]*math.sin(theta)+vy[h,j]*math.cos(theta)
+
+        def secondrot(vx,vy,theta): #Does the same as first function, just with the input vector components not being arrays
+            return vx*math.cos(theta)-vy*math.sin(theta), vx*math.sin(theta)+vy*math.cos(theta)
+
+        def coll(h,k,j): #Function that deals with particle collisions
+            theta=math.atan((y[k,j]-y[h,j])/(x[k,j]-x[h,j])) #Angle from x axis to line connecting two particles
+            #Rotation
+            vxhinitialprime=rot(vx,vy,h,j,theta)[0]
+            vyhprime=rot(vx,vy,h,j,theta)[1]
+            vxkinitialprime=rot(vx,vy,k,j,theta)[0]
+            vykprime=rot(vx,vy,k,j,theta)[1]
+            #Velocity calculation
+            vxkprimerel=vxkinitialprime-vxhinitialprime
+            vxhfinalprimerel=(2*mass[k]/(mass[h]+mass[k]))*vxkprimerel
+            vxkfinalprimerel=((mass[k]-mass[h])/(mass[k]+mass[h]))*vxkprimerel
+            vxkfinalprime=vxkfinalprimerel+vxhinitialprime
+            vxhfinalprime=vxhfinalprimerel+vxhinitialprime
+            #Rotation back
+            newvxh=secondrot(vxhfinalprime,vyhprime,-theta)[0]
+            newvyh=secondrot(vxhfinalprime,vyhprime,-theta)[1]
+            newvxk=secondrot(vxkfinalprime,vykprime,-theta)[0]
+            newvyk=secondrot(vxkfinalprime,vykprime,-theta)[1]
+            #Next position
+            x[h,j+1]=x[h,j]+(newvxh)*division
+            y[h,j+1]=y[h,j]+(newvyh)*division
+            x[k,j+1]=x[k,j]+(newvxk)*division
+            y[k,j+1]=y[k,j]+(newvyk)*division
+            #Applies velocities
+            vx[h,j]=newvxh
+            vx[k,j]=newvxk
+            vy[h,j]=newvyh
+            vy[k,j]=newvyk
+            vx[h,j+1]=newvxh
+            vx[k,j+1]=newvxk
+            vy[h,j+1]=newvyh
+            vy[k,j+1]=newvyk
+        
+        def grid(a,b): #Function that calculates spatial hash
+            return (np.floor(a/cellsize)+np.floor(b/cellsize))*width
+        
+        grid_cell=grid(x,y)
+        
+        averagevel=np.average(speed) #Average of initial speeds
+        worstcasenocoll=int(np.ceil((particlesize/averagevel)/division)) #Worst case number of increments for exclusion
+        nocoll=worstcasenocoll+1 #Number of increments for exclusion
+        check=np.zeros(number*simno).reshape(number,simno) #Array to check for exclusion
+        wallforce=np.zeros(simno)
+        
+        mindist=boxlength-particlesize #Just to make things shorter in for loop
+        j=0
+        while j<simno:
+            #Wall collisions
+            i=0
+            while i<number and j!=simno-1:
+                if abs(x[i,j])>=mindist:
+                    x[i,j+1]=x[i,j]-vx[i,j]*division
+                    vx[i,j+1]=-vx[i,j]
+                    wallforce[j]=wallforce[j]+abs(2*mass[i]*vx[i,j])
+                else:
+                    x[i,j+1]=x[i,j]+vx[i,j]*division
+                    vx[i,j+1]=vx[i,j]
+                if abs(y[i,j])>=mindist:
+                    y[i,j+1]=y[i,j]-vy[i,j]*division
+                    vy[i,j+1]=-vy[i,j]
+                    wallforce[j]=wallforce[j]+abs(2*mass[i]*vy[i,j])
+                else:
+                    y[i,j+1]=y[i,j]+vy[i,j]*division
+                    vy[i,j+1]=vy[i,j]
+                i=i+1
+            h=0
+            while h<number:
+                k=0
+                while k<number:
+                    if k!=h and check[k,j]==0.0 and check[h,j]==0.0:
+                        if abs(grid_cell[h,j]-grid_cell[k,j])<=2*width:
+                            if dist(h,k,j)<=2*particlesize and j!=simno-1:
+                                coll(h,k,j)
+                                #Exclusion (prevents multiple subsequent positions between the same particles)
+                                d=0
+                                while d<nocoll and j+d!=simno-1:
+                                    check[h,j+d]=1.0
+                                    check[k,j+d]=1.0
+                                    d=d+1
+                    k=k+1
+                h=h+1
+            j=j+1
+        
+        kineticenergies=np.zeros(number*simno).reshape(number,simno)
+        averagekineticenergy=np.zeros(simno)
+        totalkineticenergy=np.zeros(simno)
+        
+        i=0
+        while i<number:
+            kineticenergies[i]=0.5*mass[i]*(vx[i]**2+vy[i]**2)
+            i=i+1
+        
+        j=0
+        while j<simno:
+            averagekineticenergy[j]=np.average(kineticenergies[:,j])
+            j=j+1
+        
+        j=0
+        while j<simno:
+            totalkineticenergy[j]=sum(kineticenergies[:,j])
+            j=j+1
+        runpressure[s,r]=np.average(wallforce)/(8*boxlength)
+        runtemp[s,r]=np.average(averagekineticenergy) #Will be off by some factor, but should be analogous to actual temperature
+        r=r+1
+    momentumdeviation=momentumdeviation*((meanmomentum+numstep)/(meanmomentum))
+    meanmomentum=meanmomentum+numstep
+    s=s+1
+
+averagerunpressure=np.zeros(numnum)
+averageruntemp=np.zeros(numnum)
+s=0
+while s<numnum:
+    averagerunpressure[s]=np.average(runpressure[s])
+    averageruntemp[s]=np.average(runtemp[s])
+    s=s+1
+
+pressureerrors=np.zeros(numnum) #Standard deviation for each number of particles (to give error)
+temperrors=np.zeros(numnum)
+s=0
+while s<numnum:
+    pressureerrors[s]=np.std(runpressure[s])/(np.sqrt(runno))
+    temperrors[s]=np.std(runtemp[s])/(np.sqrt(runno))
+    s=s+1
+
+
+numberpart=np.zeros(numnum)
+i=0
+while i<numnum:
+    numberpart[i]=i+1
+    i=i+1
+
+pressure=plt.figure()
+plt.errorbar(numberpart,averagerunpressure,yerr=pressureerrors)
+plt.plot(numberpart,averagerunpressure)
+plt.show()
+temp=plt.figure()
+plt.errorbar(numberpart,averageruntemp,yerr=temperrors)
+plt.plot(numberpart,averageruntemp)
+plt.show()
