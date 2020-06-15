@@ -1,0 +1,391 @@
+import numpy as np
+import math
+from pyqtree import Index    #https://pypi.org/project/Pyqtree/
+from matplotlib import pyplot as plt
+
+
+"""To install pyqtree in Spyder, type   !pip install pyqtree    in the iPython Console"""
+
+
+number=4 #Number of particles
+propinfi=0.2 #Initial proportion of particles infected
+particlesize=0.1 #Particle size
+meansusceptibility=0.5 #Mean particle susceptibility (NOT INCORPORATED YET)
+susceptibilitydeviation=0.1 #Particle susceptibility standard deviation (NOT INCORPORATED YET)
+meaninfectivity=0.5 #Mean particle infectivity (NOT INCORPORATED YET)
+infectivitydeviation=0.1 #Particle infectivity standard deviation (NOT INCORPORATED YET)
+boxlength=5.0 #Dimensions of constraining box
+meanmomentum=650 #Mean initial momentum (in each direction)
+momentumdeviation=50 #Momentum standard deviation
+meanmass=60 #Mean mass
+massdeviation=15 #Mass standard deviation
+meanrecov=10 #Mean number of time increments taken to recover (NOT INCORPORATED YET)
+recovdeviation=2 #Standard deviation in number of time increments taken to recover (NOT INCORPORATED YET)
+start=0 #Start time (kind of redundant)
+end=10 #End time
+division=0.01 #Time division
+simno=int((end-start)/division) #Number of time increments
+
+
+#Creating randomly positive and negative arrays (to sign quantities)
+posnegrand=np.random.rand(number)
+posnegrand2=np.random.rand(number)
+posneg=np.zeros(number)
+posneg2=np.zeros(number)
+i=0
+while i<number:
+    if posnegrand[i]>=0.5:
+        posneg[i]=1
+    else:
+        posneg[i]=-1
+    if posnegrand2[i]>=0.5:
+        posneg2[i]=1
+    else:
+        posneg2[i]=-1
+    i=i+1
+
+mass=np.zeros(number) #Array of particle masses
+i=0
+while i<number:
+    mass[i]=np.random.normal(meanmass,massdeviation)
+    i=i+1
+
+recovtime=np.zeros(number) #Array of the recovery times for each particle
+i=0
+while i<number:
+    recovtime[i]=int(np.random.normal(meanrecov,recovdeviation))
+    i=i+1
+
+susceptibility=np.zeros(number) #Array of particles' susceptibilities to infection
+i=0
+while i<number:
+    susceptibility[i]=np.random.normal(meansusceptibility,susceptibilitydeviation)
+    i=i+1
+
+infectivity=np.zeros(number) #Array of particles' infectivities
+i=0
+while i<number:
+    infectivity[i]=np.random.normal(meaninfectivity,infectivitydeviation)
+    i=i+1
+
+inf=np.zeros(number*simno).reshape(number,simno) #Array denoting which particles are infected
+#Filling in initial infected particles
+i=0
+while i<number:
+    if posnegrand[i]<=propinfi:
+        inf[i,0]=1
+    else:
+        inf[i,0]=0
+    i=i+1
+
+mass=np.zeros(number) #Array of particle masses
+i=0
+while i<number:
+    mass[i]=np.random.normal(meanmass,massdeviation)
+    i=i+1
+
+x=np.zeros(number*simno).reshape(number,simno) #Array of all x values
+y=np.zeros(number*simno).reshape(number,simno) #Array of all y values
+xi=np.random.rand(number)*(boxlength-particlesize) #Array of initial x values (unsigned)
+yi=np.random.rand(number)*(boxlength-particlesize) #Array of initial y values (unsigned)
+
+#Inputting initial x and y values
+i=0
+while i<number:
+    x[i,0]=xi[i]*posneg[i]
+    y[i,0]=yi[i]*posneg2[i]
+    i=i+1
+
+vx=np.zeros(number*simno).reshape(number,simno) #Array of all x velocities
+vy=np.zeros(number*simno).reshape(number,simno) #Array of all y velocities
+
+speed=np.zeros(number) #Array of particles' intitial speeds
+angles=np.random.random(number)*math.pi*2 #Array of particles' intiial angles of projection
+#Creating and inputting initial x and y velocities
+i=0
+while i<number:
+    speed[i]=(np.random.normal(meanmomentum,momentumdeviation))/mass[i]
+    vx[i,0]=speed[i]*math.cos(angles[i])
+    vy[i,0]=speed[i]*math.sin(angles[i])
+    i=i+1
+
+#def dist(a,b,c): #Function that evaluates the distance between two particles
+#    return np.sqrt((x[a,c]-x[b,c])**2+(y[a,c]-y[b,c])**2)
+
+def rot(vx,vy,h,j,theta): #Function that rotates vector, given orthogonal components (returns x',y' components)
+    return vx[h,j]*math.cos(theta)-vy[h,j]*math.sin(theta), vx[h,j]*math.sin(theta)+vy[h,j]*math.cos(theta)
+
+def secondrot(vx,vy,theta): #Does the same as first function, just with the input vector components not being arrays
+    return vx*math.cos(theta)-vy*math.sin(theta), vx*math.sin(theta)+vy*math.cos(theta)
+
+def coll(h,k,j): #Function that deals with particle collisions
+    theta=math.atan(y[k,j]-y[h,j])/(x[k,j]-x[h,j]) #Angle from x axis to line connecting two particles
+    #Rotation
+    vxhinitialprime=rot(vx,vy,h,j,theta)[0]
+    vyhprime=rot(vx,vy,h,j,theta)[1]
+    vxkinitialprime=rot(vx,vy,k,j,theta)[0]
+    vykprime=rot(vx,vy,k,j,theta)[1]
+    #Velocity calculation
+    vxkprimerel=vxkinitialprime-vxhinitialprime
+    vxhfinalprimerel=(2*mass[k]/(mass[h]+mass[k]))*vxkprimerel
+    vxkfinalprimerel=((mass[k]-mass[h])/(mass[k]+mass[h]))*vxkprimerel
+    vxkfinalprime=vxkfinalprimerel+vxhinitialprime
+    vxhfinalprime=vxhfinalprimerel+vxhinitialprime
+    #Rotation back
+    newvxh=secondrot(vxhfinalprime,vyhprime,-theta)[0]
+    newvyh=secondrot(vxhfinalprime,vyhprime,-theta)[1]
+    newvxk=secondrot(vxkfinalprime,vykprime,-theta)[0]
+    newvyk=secondrot(vxkfinalprime,vykprime,-theta)[1]
+    #Next position
+    x[h,j+1]=x[h,j]+(newvxh)*division
+    y[h,j+1]=y[h,j]+(newvyh)*division
+    x[k,j+1]=x[k,j]+(newvxk)*division
+    y[k,j+1]=y[k,j]+(newvyk)*division
+    #Applies velocities
+    vx[h,j]=newvxh
+    vx[k,j]=newvxk
+    vy[h,j]=newvyh
+    vy[k,j]=newvyk
+    vx[h,j+1]=newvxh
+    vx[k,j+1]=newvxk
+    vy[h,j+1]=newvyh
+    vy[k,j+1]=newvyk
+
+averagevel=np.average(speed) #Average of initial speeds
+worstcasenocoll=int(np.ceil((particlesize/averagevel)/division)) #Worst case number of increments for exclusion
+nocoll=worstcasenocoll+1 #Number of increments for exclusion
+collcheck=np.zeros(number*simno).reshape(number,simno) #Array to check for exclusion
+numberofcollisions=np.zeros(number)
+
+mindist=boxlength-particlesize #Just to make things shorter in for loop
+wallforce=np.zeros(simno)
+
+
+boundary=(-5,-5,5,5)     #container dimensions
+qtree = Index(bbox=boundary) #setting quadtree boundary region for first node
+#d = (abs(np.mean(speed)*division))*0.5
+d=0.125    #d= half thee side of square centred on each point. If the squares overlap collision will be checked
+   #d>max distance a point can travel with max v in one time increment
+
+
+
+"""use these values for pyplot of how bbox works"""
+#for testing quadtree
+#simno=4
+#x=np.array([[1,-2,-4,-3],[1.2,3,4,2],[-1,0,2,3],[-4,-2,-1,0]])
+#y=np.array([[-1,0,2,3],[-1.2,-2,-1,0],[2,3,4,2],[1,-2,-4,-3]])
+#print(x)
+
+
+num_of_coll=[0] #count number of collisions
+h_list=[number] #keep track of points collisions are calculated for in an interval j
+#h_list  keeps track of the values of h coll(h,k,j) was used for so that the same calculation isn't done twice for coll(k,h,j)
+#h_list=number as number isn't an attainable value and so that the list isn't empty which lets us use the indicies of the list
+
+
+def qtree_insert(j):  #function to inser points in quadtree at jth interval
+    i=0
+    while i<number:
+        point=(x[i,j],y[i,j]) #point being inserted into qtree
+        point_bbox = (x[i,j]-d,y[i,j]-d,x[i,j]+d,y[i,j]+d)  #boundary box (bbox) surrounding each square such that at max velocity any point outside the square cannot collide with the point in the square
+        qtree.insert(point,point_bbox)
+        i=i+1
+
+
+
+def qtree_check(h,j):
+    #fuction to check whether neighbouring points will collide withparticle h at interval j
+    print('j=',j)
+    #d = (abs(np.amax(speed)*division))*0.5
+    d=0.15
+    check_sq=(x[h,j]-d,y[h,j]-d,x[h,j]+d,y[h,j]+d)  #square centred on h to check for overlapping boundary boxes from other points (I think it includes point h but that's dealt with later)
+    print('h=',h)
+    poss_coll=qtree.intersect(check_sq)  #list of coordinates of points that could collide with h, i.e points who's bbox overlap with check_sq
+    #print('d=',d)
+    r=(x[h,j],y[h,j]) #point (point h) around which are checking for collising points
+    #print('r=',r)
+    #print('poss_coll before remove=',poss_coll)
+    poss_coll.remove(r)  #remove point h from qtree
+    coll_num= len(poss_coll)
+    
+    
+    if coll_num == 0:    #if no other points are in the bbox of point h
+        if abs(x[h,j])>mindist:    #wall collision
+            x[h,j+1]=x[h,j]-vx[h,j]*division
+            vx[h,j+1]=-vx[h,j]
+            wallforce[j]=wallforce[j]+abs(2*mass[h]*vx[h,j])
+        else:
+            x[h,j+1]=x[h,j]+vx[h,j]*division  #No collision
+            vx[h,j+1]=vx[h,j]
+        if abs(y[h,j])>=mindist:
+            y[h,j+1]=y[h,j]-vy[h,j]*division
+            vy[h,j+1]=-vy[h,j]
+            wallforce[j]=wallforce[j]+abs(2*mass[h]*vy[h,j])
+        else:
+            y[h,j+1]=y[h,j]+vy[h,j]*division
+            vy[h,j+1]=vy[h,j]
+         #add adjusted velococity
+    
+    else:
+        """
+        #Testing for single interval. Run to see how bbox works
+        if j==0 and h==0:
+            print('TEST START')
+            check_sq=(x[0,0]-d,y[0,0]-d,x[0,0]+d,y[0,0]+d)
+            print('check_sq=',check_sq)
+            
+            r=(x[0,0],y[0,0])
+            print('len coll_num=',coll_num)
+            print(r)
+            print('poss_coll=',poss_coll)
+              
+           
+            print('poss_coll=',poss_coll)
+            coll_num= len(poss_coll)
+            a,b,c,e= check_sq
+            xa=[a,c,c,a,a]  #check_square
+            ya=[b,b,e,e,b]  #coordinates
+            fig1=plt.figure()
+            ax=fig1.add_axes([0,0,1,1])
+            ax.scatter([x[0,0],x[1,0],x[2,0],x[3,0]], [y[0,0],y[1,0],y[2,0],y[3,0]], color='r')
+            plt.plot([x[1,0]-d,x[1,0]+d,x[1,0]+d,x[1,0]-d,x[1,0]-d], [y[1,0]-d,y[1,0]-d,y[1,0]+d,y[1,0]+d,y[1,0]-d])
+            plt.plot(xa,ya)
+            plt.ylim(-2, 0)
+            plt.xlim(0, 2)
+            plt.gca().set_aspect('equal', adjustable='box')
+            plt.show(fig1)
+            print('TEST END')
+        #Test End
+        """
+        
+        #print('poss_coll point=',poss_coll)
+        #print('coll_num=',coll_num)
+        #print('vxh=',vx[h,j])
+        #print('vyh=',vy[h,j])
+        #print('massh=',mass[h])
+        z=0  #index of poss_coll list
+        while z<coll_num:
+            x_z,y_z = poss_coll[z] #getting x,y coordinates of points that could collide
+            q=0   #problem is that there's no way to keep the x[i,j] and y[i,j] indicies of the poss_coll points so we have to compare poss_coll[z] with all x entries at jth interval to find point k that could collide
+                   
+            while q<number:
+                if x[q,j] == x_z and y[q,j] == y_z and q!=h: #gets rid of point check_sp is centred on
+                    k=q
+                    #print('k=',k)
+                    #print('vxk=',vx[k,j])
+                    #print('vyk=',vy[k,j])
+                    #print('massk=',mass[k])
+                q=q+1
+            
+            dist= math.sqrt((x[h,j]-x_z)**2+(y[h,j]-y_z)**2)  #distance between points h and k
+            
+            if dist >= 2*particlesize and j != simno-1:   #if particle is in bbox but doesn't collide with h
+                x[h,j+1]=x[h,j]+vx[h,j]*division  
+                vx[h,j+1]=vx[h,j]
+                y[h,j+1]=y[h,j]+vy[h,j]*division
+                vy[h,j+1]=vy[h,j]
+                
+                inf[h,j+1]=inf[h,j] 
+                inf[k,j+1]=inf[k,j]
+                
+             #if particle is colliding with h   
+            elif collcheck[k,j]==0.0 and collcheck[h,j]==0.0:#carries out len(poss_coll) distance checks
+                if num_of_coll[0]==0:  #if no collisions have taken place so far (no need to check for double coll(h,j,k) calculations)
+                    coll(h,k,j)
+                    print('collision between h=',h ,'and k=',k )
+                    num_of_coll[0]=num_of_coll[0]+1  #counts number of collisions in interval j
+                    h_list.append(h)  #adds value of h coll(h,k,j) haas been calculated for already
+                
+                
+                    d=0
+                    while d<nocoll and j+d!=simno-1:
+                        collcheck[h,j+d]=1.0
+                        collcheck[k,j+d]=1.0
+                        d=d+1
+                        numberofcollisions[h]=numberofcollisions[h]+1
+                        numberofcollisions[k]=numberofcollisions[k]+1
+                        if inf[h,j]==1.0 or inf[k,j]==1.0:
+                            if inf[h,j]==1.0 and inf[k,j]==1.0:
+                                inf[h,j+1]=inf[h,j]
+                                inf[k,j+1]=inf[k,j]
+                            elif inf[h,j]==1.0:
+                                   inf[h,j+1]=1.0
+                                   inf[k,j+1]=1.0
+                            elif inf[k,j]==1.0:
+                                  inf[h,j+1]=1.0
+                                  inf[k,j+1]=1.0
+                        else:
+                            inf[h,j+1]=inf[h,j]
+                            inf[k,j+1]=inf[k,j]
+                            
+            elif num_of_coll[0]>0:  #if collsions have taken place already for interval j
+                i=0
+                while i<len(h_list):
+                    if k == h_list[i]:  #if  coll(k,h,j) has been calculated already
+                        break
+                    elif collcheck[k,j]==0.0 and collcheck[h,j]==0.0:  #if collisions have occured already but not for this h-k pair
+                        coll(h,k,j)
+                        print('collision between h=',h ,'and k=',k )
+                        num_of_coll[0]=num_of_coll[0]+1
+                        h_list.append(h)
+                    
+                
+                
+                        d=0
+                        while d<nocoll and j+d!=simno-1:
+                            collcheck[h,j+d]=1.0
+                            collcheck[k,j+d]=1.0
+                            d=d+1
+                            numberofcollisions[h]=numberofcollisions[h]+1
+                            numberofcollisions[k]=numberofcollisions[k]+1
+                            if inf[h,j]==1.0 or inf[k,j]==1.0:
+                                if inf[h,j]==1.0 and inf[k,j]==1.0:
+                                    inf[h,j+1]=inf[h,j]
+                                    inf[k,j+1]=inf[k,j]
+                                elif inf[h,j]==1.0:
+                                       inf[h,j+1]=1.0
+                                       inf[k,j+1]=1.0
+                                elif inf[k,j]==1.0:
+                                      inf[h,j+1]=1.0
+                                      inf[k,j+1]=1.0
+                            else:
+                                inf[h,j+1]=inf[h,j]
+                                inf[k,j+1]=inf[k,j]
+                    i=i+1
+                    
+            elif j!=simno-1:
+                inf[h,j+1]=inf[h,j] 
+                inf[k,j+1]=inf[k,j]
+
+            z=z+1            
+            
+                
+        
+        
+        
+        
+
+j=0
+while j<simno:
+    h=0
+    while h<number and j!= simno-1:
+        qtree = Index(bbox=boundary)  #loop inserts all points at jth interval
+        qtree_insert(j)               #,checks for collisions
+        qtree_check(h,j)              # and deletes quadtree to rebuild again at (j+1)th interval
+        h=h+1
+        h_list=[number]                 #delete h list to rebuild for
+        del qtree
+    print('x[0,j]=',x[0,j])
+    print('y[0,j]=',y[0,j])
+    print('x[1,j]=',x[1,j])
+    print('y[1,j]=',y[1,j])  
+    print('x[2,j]=',x[2,j])  
+    print('y[2,j]=',y[2,j])  
+    print('x[3,j]=',x[3,j])  
+    print('y[3,j]=',y[3,j])  
+    j=j+1                    
+    
+    
+#code now runs without errors but not being implemented correctly
+#x[h,j] and x[k,j] (same foy y), the veloity components of h and k still equal zero after a collision between h and k
+#could this be a problem with the collision function?
